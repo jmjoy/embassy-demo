@@ -1,6 +1,9 @@
+pub mod img;
+
 use defmt::debug;
 use embassy_stm32::{gpio::Output, mode::Async, spi::Spi};
 use embassy_time::Timer;
+use core::{cmp::min, ops::RemAssign};
 
 pub struct LCD {
     /// SPI1外设
@@ -160,7 +163,7 @@ impl LCD {
     async fn write_data(&mut self, data: u8) {
         self.cs.set_low();
         self.spi.write(&[data]).await.unwrap();
-        // Timer::after_micros(1).await;
+        Timer::after_micros(1).await;
         self.cs.set_high();
     }
 
@@ -172,11 +175,31 @@ impl LCD {
     pub async fn fill(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16, color: u16) {
         self.set_address(x_start, y_start, x_end - 1, y_end - 1)
             .await;
-        for _ in y_start..y_end {
-            for _ in x_start..x_end {
-                self.write_data_u16(color).await;
+
+        let mut buf = [0u16; 32];
+        let mut remain = ((x_end - x_start) * (y_end - y_start)) as usize;
+
+        while remain > 0 {
+            let n = min(remain, 32) as usize;
+            for i in 0..n {
+                buf[i] = color;
             }
+
+            self.cs.set_low();
+            self.spi.write(&buf[..n]).await.unwrap();
+            Timer::after_micros(1).await;
+            self.cs.set_high();
+
+            remain -= n;
         }
+    }
+
+    pub async fn fill_img(&mut self) {
+        self.set_address(0, 0, 160 - 1, 80 - 1).await;
+        self.cs.set_low();
+        self.spi.write(&img::G_IMAGE_IMG).await.unwrap();
+        Timer::after_micros(1).await;
+        self.cs.set_high();
     }
 
     async fn set_address(&mut self, x_start: u16, y_start: u16, x_end: u16, y_end: u16) {

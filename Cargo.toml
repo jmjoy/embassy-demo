@@ -32,6 +32,8 @@ cortex-m = { version = "0.7.7", features = [
 ] }
 cortex-m-rt = "0.7.3"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
+embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
+embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 
 [profile.dev]
 opt-level = "s"

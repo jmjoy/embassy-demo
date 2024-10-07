@@ -3,6 +3,7 @@
 
 mod lcd;
 mod w25q64;
+mod w25q64_hal;
 
 use core::sync::atomic::{AtomicIsize, Ordering};
 use defmt::info;
@@ -13,12 +14,15 @@ use embassy_stm32::{
     mode::Async,
     pac,
     spi::{self, Spi},
-    time,
+    time, usart::{self, Uart, UartTx},
 };
 use embassy_time::Timer;
+use embedded_hal::{digital::OutputPin, spi::SpiDevice};
+use embedded_hal_async::spi::SpiBus;
 use lcd::LCD;
 use panic_probe as _;
 use w25q64::W25Q64;
+use w25q64_hal::W25Q64Hal;
 
 static NUM: AtomicIsize = AtomicIsize::new(0);
 
@@ -40,7 +44,7 @@ async fn main(spawner: Spawner) {
     let spi = Spi::new(
         p.SPI2, p.PB13, p.PB15, p.PB14, p.DMA1_CH5, p.DMA1_CH4, spi_config,
     );
-    spawner.spawn(w25q46_task(spi, nss)).unwrap();
+    spawner.spawn(w25q46_hal_task(spi, nss)).unwrap();
 
     // LCD
     pac::AFIO.mapr().modify(|w| {
@@ -90,6 +94,7 @@ async fn show_lcd(
 ) {
     let mut lcd = LCD::new(spi, dc, res, cs, blk).await;
     lcd.fill(0, 0, 160, 80, 0xFC07).await;
+    lcd.fill_img().await;
     loop {
         Timer::after_secs(6).await;
     }
@@ -98,6 +103,16 @@ async fn show_lcd(
 #[embassy_executor::task]
 async fn w25q46_task(spi: Spi<'static, Async>, nss: Output<'static>) {
     let mut w25q64 = W25Q64::new(spi, nss);
+    let jedec = w25q64.read_jedec().await;
+    info!(
+        "w25q64 jedec: vendor: {}, device: {}",
+        jedec.vendor_id, jedec.device_id
+    );
+}
+
+#[embassy_executor::task]
+async fn w25q46_hal_task(spi: impl SpiBus + 'static, nss: impl OutputPin + 'static) {
+    let mut w25q64 = W25Q64Hal::new(spi, nss);
     let jedec = w25q64.read_jedec().await;
     info!(
         "w25q64 jedec: vendor: {}, device: {}",
