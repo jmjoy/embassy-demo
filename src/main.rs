@@ -2,9 +2,9 @@
 #![no_main]
 
 mod lcd;
-mod w25q64;
 mod w25q64_hal;
 
+use crate::{lcd::LCD, w25q64_hal::W25Q64Hal};
 use core::sync::atomic::{AtomicIsize, Ordering};
 use defmt::info;
 use defmt_rtt as _;
@@ -13,22 +13,35 @@ use embassy_stm32::{
     gpio::{Input, Level, Output, Pull, Speed},
     mode::Async,
     pac,
+    rcc::{Hse, HseMode, LsConfig, LseConfig, LseDrive, LseMode, RtcClockSource, Sysclk},
     spi::{self, Spi},
-    time, usart::{self, Uart, UartTx},
+    time::{self, Hertz},
 };
 use embassy_time::Timer;
-use embedded_hal::{digital::OutputPin, spi::SpiDevice};
+use embedded_hal::digital::OutputPin;
 use embedded_hal_async::spi::SpiBus;
-use lcd::LCD;
 use panic_probe as _;
-use w25q64::W25Q64;
-use w25q64_hal::W25Q64Hal;
 
 static NUM: AtomicIsize = AtomicIsize::new(0);
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let p = embassy_stm32::init(Default::default());
+    let mut config = embassy_stm32::Config::default();
+    config.rcc.hsi = false;
+    config.rcc.hse = Some(Hse {
+        freq: Hertz(8_000_000),
+        mode: HseMode::Oscillator,
+    });
+    config.rcc.sys = Sysclk::HSE;
+    config.rcc.ls = LsConfig {
+        rtc: RtcClockSource::LSE,
+        lsi: false,
+        lse: Some(LseConfig {
+            frequency: Hertz(32_768),
+            mode: LseMode::Oscillator(LseDrive::default()),
+        }),
+    };
+    let p = embassy_stm32::init(config);
     info!("点灯大师，启动!");
 
     // BTN
@@ -98,16 +111,6 @@ async fn show_lcd(
     loop {
         Timer::after_secs(6).await;
     }
-}
-
-#[embassy_executor::task]
-async fn w25q46_task(spi: Spi<'static, Async>, nss: Output<'static>) {
-    let mut w25q64 = W25Q64::new(spi, nss);
-    let jedec = w25q64.read_jedec().await;
-    info!(
-        "w25q64 jedec: vendor: {}, device: {}",
-        jedec.vendor_id, jedec.device_id
-    );
 }
 
 #[embassy_executor::task]

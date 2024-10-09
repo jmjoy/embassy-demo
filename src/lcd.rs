@@ -1,9 +1,9 @@
 pub mod img;
 
+use core::cmp::min;
 use defmt::debug;
 use embassy_stm32::{gpio::Output, mode::Async, spi::Spi};
 use embassy_time::Timer;
-use core::{cmp::min, ops::RemAssign};
 
 pub struct LCD {
     /// SPI1外设

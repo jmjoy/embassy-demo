@@ -1,5 +1,5 @@
 use embedded_hal::digital::OutputPin;
-use embedded_hal_async::spi::{SpiBus, SpiDevice};
+use embedded_hal_async::spi::SpiBus;
 
 #[derive(Default)]
 pub struct Jedec {
