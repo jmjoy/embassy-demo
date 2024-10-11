@@ -2,6 +2,7 @@
 #![no_main]
 
 mod lcd;
+mod pwm;
 mod w25q64_hal;
 
 use crate::{lcd::LCD, w25q64_hal::W25Q64Hal};
@@ -21,6 +22,7 @@ use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
 use embedded_hal_async::spi::SpiBus;
 use panic_probe as _;
+use pwm::RgbLed;
 
 static NUM: AtomicIsize = AtomicIsize::new(0);
 
@@ -74,6 +76,10 @@ async fn main(spawner: Spawner) {
     let cs = Output::new(p.PB7, Level::High, Speed::VeryHigh);
     let blk = Output::new(p.PB8, Level::High, Speed::VeryHigh);
     spawner.spawn(show_lcd(spi, dc, res, cs, blk)).unwrap();
+
+    // PWM (RGB LED)
+    let mut rgb_led = RgbLed::new(p.TIM3, p.PA6, p.PA7, p.PB0);
+    rgb_led.set_rgb(255, 255, 0);
 
     // Print
     loop {
